@@ -286,7 +286,8 @@ concurrency level
 ### Clone and setup
 
 ```bash
-git clone https://github.com/yourusername/llm-inference-serving.git
+git clone https://github.com/Akshatha-22/LLM-Inference-Serving-System
+.git
 cd llm-inference-serving
 python -m venv venv
 source venv/bin/activate  # or `venv\Scripts\activate` on Windows
