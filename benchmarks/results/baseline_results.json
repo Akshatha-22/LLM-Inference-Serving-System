@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-05-15 20:47:53",
+  "model": "gpt2",
+  "load_time_seconds": 1.369114637374878,
+  "memory_mb": 363.6328125,
+  "parameters": 124439808,
+  "tokens_per_sec": {
+    "avg": 11.493703305156133,
+    "min": 6.454996320776383,
+    "max": 15.659188412449975
+  },
+  "test_prompt": "The future of artificial intelligence is",
+  "max_new_tokens": 50
+}
