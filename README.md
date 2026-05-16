@@ -15,6 +15,7 @@
 ## Problem Statement
 
 Large Language Models (LLMs) are slow and memory-hungry. Serving them to multiple users simultaneously is hard. Existing solutions assume NVIDIA GPUs with CUDA. This project solves the same problem **on CPU hardware**, proving algorithmic understanding without expensive GPUs.
+---
 
 ## ⚠️ Hardware constraints (read first)
  
@@ -24,6 +25,7 @@ Large Language Models (LLMs) are slow and memory-hungry. Serving them to multipl
 | Model | GPT-2 Small (124M parameters) |
 | Why not vLLM? | vLLM requires CUDA. Building from scratch teaches how PagedAttention and continuous batching actually work. With GPU access, I'd use vLLM + FlashAttention-2. |
 | Context limit | GPT-2 has a hard 1024-token limit (sinusoidal positional embeddings). 32k context requires RoPE/ALiBi models like LLaMA. |
+--- 
 
 ## Architecture Overview
 -The system has four main flows. First, the request lifecycle: API key validation → rate limiting → priority queue → streaming response. Second, the scheduler: continuous batching that rebuilds the batch after every decode step — no padding waste. Third, memory: paged KV cache with block tables and copy-on-write for beam search. Fourth, batching: static vs continuous tradeoff analysis.
@@ -225,7 +227,7 @@ Large Language Models (LLMs) are slow and memory-hungry. Serving them to multipl
 │  │ Implementation   │ Simple (timer+queue) │ Complex (per-step state machine)    │  │
 │  └──────────────────┴─────────────────────┴─────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────────────┘
-
+---
 
 ## Measured results (Days 1–5)
  
@@ -349,22 +351,6 @@ llm-inference-server/
  
 ---
  
-## 📝 Failure log
- 
-### Entry 1 — Day 1: False baseline (attention_mask bug)
- 
-| Field | Detail |
-|---|---|
-| Date | 2026-05-15 |
-| What happened | Baseline reported 20.60 tok/s — unrealistically high for i5 CPU |
-| How I found it | Expected range is 8–12 tok/s for this hardware; 20.60 far exceeded it |
-| Root cause | GPT-2 pad token = eos token, causing incorrect attention_mask inference |
-| Fix applied | Corrected mask handling; result dropped to honest 11.49 tok/s |
-| Time to fix | ~2 hours |
-| What I learned | Always sanity-check performance numbers against hardware specs. A number that looks too good is a bug, not a win. |
- 
----
- 
 ##  RAM requirements
  
 | Model | Size | RAM (idle) | RAM (1k ctx) | Max context |
@@ -375,14 +361,10 @@ llm-inference-server/
  
 > GPT-2's 1024-token limit comes from sinusoidal positional embeddings.
 > For 32k context, you need RoPE or ALiBi (e.g. LLaMA, GPT-NeoX).
- 
 ---
- 
-*60-day project · GPT-2 on i5 CPU · All algorithms implemented from scratch*
-*Last updated: Day 5 of 60*
- 
 
 ## Benchmark Section
+
 comming soon....
 will include:
 CPU specs
@@ -390,8 +372,11 @@ RAM
 model quantization
 concurrency level
 -Without hardware specs, benchmarks are meaningless.
+---
 
 ## Engineering Challenges
+coming soon...
+---
 
 ## Tradeoffs Section
 | **Decision** | **Trade off**|
@@ -404,7 +389,7 @@ concurrency level
 
 ## Future Improvements
 (to show scalability thinking)
-
+---
 ##  Quick Start (5 minutes)
 ### Clone and setup
 ```bash
@@ -425,6 +410,9 @@ curl -X POST http://localhost:8000/v1/completions \
  
 ---
 ## Screenshots Section
+coming soon....
+
+---
 
 *60-day project · GPT-2 on i5 CPU · All algorithms implemented from scratch*
 *Last updated: Day 5 of 60*
