@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+
+# Debug scripts
+debug_*.py
+test_correct.py
+clean_test.py
+proper_client.py
+*_simple.py
+*_fixed.py
+
+# Results
+benchmarks/results/*.json
+benchmarks/results/*.csv
+profiles/*.svg
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
