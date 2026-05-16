@@ -8,13 +8,13 @@
 
 ## One-Sentence Summary
 
-> **A production-ready LLM serving system that serves multiple users concurrently on a CPU laptop, implementing continuous batching, paged KV cache, and speculative decoding — the same core algorithms powering vLLM and TensorRT-LLM.**
+**A production-ready LLM serving system that serves multiple users concurrently on a CPU laptop, implementing continuous batching, paged KV cache, and speculative decoding — the same core algorithms powering vLLM and TensorRT-LLM.**
 
 ---
 
 ## Problem Statement
 
-Large Language Models (LLMs) are slow and memory-hungry. Serving them to multiple users simultaneously is hard. Existing solutions assume NVIDIA GPUs with CUDA. This project solves the same problem **on CPU hardware**, proving algorithmic understanding without expensive GPUs.
+> Large Language Models (LLMs) are slow and memory-hungry. Serving them to multiple users simultaneously is hard. Existing solutions assume NVIDIA GPUs with CUDA. This project solves the same problem **on CPU hardware**, proving algorithmic understanding without expensive GPUs.
 ---
 
 ## ⚠️ Hardware constraints (read first)
@@ -365,7 +365,7 @@ llm-inference-server/
 
 ## Benchmark Section
 
-comming soon....
+>comming soon....
 will include:
 CPU specs
 RAM
@@ -375,7 +375,7 @@ concurrency level
 ---
 
 ## Engineering Challenges
-coming soon...
+>coming soon...
 ---
 
 ## Tradeoffs Section
