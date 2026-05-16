@@ -1,4 +1,4 @@
-## 📝 Failure log
+## Failure log
  
 ### Entry 1 — Day 1: False baseline (attention_mask bug)
  
