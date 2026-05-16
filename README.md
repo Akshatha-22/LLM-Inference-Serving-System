@@ -1,6 +1,6 @@
 # LLM-Inference-Serving-System
 
-**CPU-first · Continuous Batching · Paged KV Cache · Speculative Decoding**
+**CPU-first · GPT-2 model · Continuous Batching · Paged KV Cache · Speculative Decoding**
 
 [![CI](https://github.com/Akshatha-22/LLM-Inference-Serving-System/actions/workflows/test.yml/badge.svg)(https://github.com/Akshatha-22/LLM-Inference-Serving-System/actions/workflows/test.yml)]
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -16,45 +16,14 @@
 
 Large Language Models (LLMs) are slow and memory-hungry. Serving them to multiple users simultaneously is hard. Existing solutions assume NVIDIA GPUs with CUDA. This project solves the same problem **on CPU hardware**, proving algorithmic understanding without expensive GPUs.
 
-**What this system does:**
-| Question | Answer |
-|----------|--------|
-| **What problem?** | Serve LLMs to multiple users concurrently on limited hardware |
-| **What's unique?** | Implements vLLM-style algorithms from scratch on CPU |
-| **What scale?** | 20-30 concurrent users, 35-65 tok/sec on i5 laptop |
-| **Key concepts?** | Continuous batching, PagedAttention, preemption, speculative decoding |
-| **Hero Metrics?** | p99 latency, throughput, fragmentation, accept rate |
-| **Tradeoffs?** | Throughput vs latency, fairness vs efficiency, RAM vs context |
-
-**What you can learn from this codebase:**
-- How vLLM's PagedAttention works under the hood
-- How continuous batching differs from static batching
-- When speculative decoding helps (and when it hurts)
-- How to build production-ready inference systems
-
-## Key Results
-coming soon....
-
-## System Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| CPU | Intel i5-8250U (4 cores) | Intel i7-1165G7 (8 cores) |
-| RAM | 8 GB | 16 GB |
-| Storage | 10 GB free | 20 GB SSD |
-| OS | Ubuntu 20.04+ / macOS 12+ / WSL2 | Same |
-| GPU | ❌ Not required | ❌ Not required |
-
-
-> ⚠️ **Honest constraint:** This is a CPU implementation. It demonstrates algorithms, not scale. The same architecture on GPU would serve 1000+ users at 100+ tok/s.
-
-## Why This Project Exists
-(-make it intentional and mature)
-
-## Systems Concepts Implemented
-Examples- Component |	Description
-Continuous Batching, KV Cache Paging, Preemption, Speculative Decoding, ...
-
+## ⚠️ Hardware constraints (read first)
+ 
+| Constraint | Detail |
+|-------------|---------|
+| Hardware | Intel i5 CPU, 16GB RAM, NVMe SSD, no GPU |
+| Model | GPT-2 Small (124M parameters) |
+| Why not vLLM? | vLLM requires CUDA. Building from scratch teaches how PagedAttention and continuous batching actually work. With GPU access, I'd use vLLM + FlashAttention-2. |
+| Context limit | GPT-2 has a hard 1024-token limit (sinusoidal positional embeddings). 32k context requires RoPE/ALiBi models like LLaMA. |
 
 ## Architecture Overview
 -The system has four main flows. First, the request lifecycle: API key validation → rate limiting → priority queue → streaming response. Second, the scheduler: continuous batching that rebuilds the batch after every decode step — no padding waste. Third, memory: paged KV cache with block tables and copy-on-write for beam search. Fourth, batching: static vs continuous tradeoff analysis.
@@ -258,6 +227,161 @@ Continuous Batching, KV Cache Paging, Preemption, Speculative Decoding, ...
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
 
+## Measured results (Days 1–5)
+ 
+> These are real, measured numbers on the hardware above.
+> Future optimization targets are listed separately below.
+ 
+### Baseline inference (Day 1–2)
+ 
+| Metric | Value | Notes |
+|---|---|---|
+| Tokens/sec (avg) | **11.49** | 5-run average, greedy decode |
+| Tokens/sec (min) | 6.45 | Cold CPU cache, first run |
+| Tokens/sec (max) | 15.66 | Warm cache, peak |
+| Model load time | 1.37s | Cached (NVMe SSD) |
+| First load time | 205s | Download + unzip |
+| Memory (idle) | 363.6 MB | GPT-2 Small weights |
+| Parameters | 124,439,808 | — |
+| Hardware | i5 CPU, 16GB RAM | No GPU |
+| Date measured | 2026-05-15 | — |
+ 
+**Why variance exists (6.45 → 15.66):** CPU frequency scaling (thermal throttling on laptop),
+background OS processes, thread scheduling jitter. This is normal for CPU inference.
+The average (11.49 tok/s) is the reliable baseline number.
+ 
+Baseline saved to: `benchmarks/results/phase1_baseline/baseline_results.json`
+ 
+---
+ 
+### FastAPI server (Days 3–5)
+ 
+| Feature | Status |
+|---|---|
+| HTTP API (FastAPI) | ✅ Running |
+| `/v1/completions` endpoint | ✅ Working |
+| Non-streaming responses | ✅ Correct output |
+| Streaming SSE responses | ✅ Spaces preserved |
+| Request ID tracing (structlog + UUID) | ✅ `req_xxx` in logs |
+| Health check endpoint | ✅ Returning status |
+| Test suite | ✅ Passing |
+ 
+**Performance impact of HTTP layer:**
+ 
+| Metric | Direct (Day 1–2) | Via API (Day 3–5) | Delta |
+|---|---|---|---|
+| Tokens/sec | 11.49 | 11.49 | ±0 (identical) |
+| Memory | 363.6 MB | 368.1 MB | +4.5 MB (API overhead) |
+| Startup time | 1.37s | 3.16s | +1.8s (one-time API init) |
+ 
+The HTTP layer adds ~0.1s overhead for request parsing but does not affect generation speed.
+ 
+---
+ 
+## Engineering decisions (Day 1–5)
+ 
+### Why structlog over OpenTelemetry
+OpenTelemetry setup (collector, exporter, trace propagation) costs 1–2 days solo.
+`structlog` + UUID `request_id` gives 90% of the observability value at 10% of the setup cost.
+OpenTelemetry is documented as future work.
+ 
+### GPT-2 tokenization quirk
+GPT-2 uses the same token ID for padding and end-of-sequence.
+This produces an `attention_mask` warning that is informational, not an error.
+Results at 11.49 tok/s are correct. The warning can be silenced with:
+```python
+tokenizer.pad_token = tokenizer.eos_token
+```
+ 
+---
+ 
+## Optimization targets (not yet measured)
+ 
+> These are forward-looking targets based on the project plan.
+> They will be updated with real measurements as each phase is completed.
+ 
+| Phase | Feature | Current | Target | Status |
+|---|---|---|---|---|
+| Day 1–2 | Baseline | **11.49 tok/s** | — | ✅ measured |
+| Day 8–10 | Dynamic batching | 11.49 | ~20 tok/s (+74%) | ⏳ not started |
+| Day 15–17 | Continuous batching | 11.49 | ~35 tok/s (+204%) | ⏳ not started |
+| Day 22–28 | + PagedAttention | 11.49 | ~40 tok/s (+248%) | ⏳ not started |
+| Day 41–44 | + Speculative decoding | 11.49 | ~50 tok/s (+335%) | ⏳ not started |
+ 
+---
+ 
+## 🗂️ Project structure
+ 
+```
+llm-inference-server/
+├── src/
+│   ├── model/          # GPT-2 wrapper, generate loop, tokenizer
+│   ├── server/         # FastAPI app, routes, request queue, tracing
+│   ├── scheduler/      # Sequence dataclass, static batcher, continuous scheduler
+│   ├── kv_cache/       # Block allocator, paged attention, copy-on-write
+│   ├── speculative/    # Draft model, target model, acceptance sampler
+│   └── observability/  # Prometheus metrics, GPU gap analysis
+├── tests/
+│   ├── unit/           # Block allocator, state machine, acceptance sampler
+│   └── integration/    # Correctness vs HuggingFace baseline
+├── benchmarks/         # Load generator, benchmark scripts, results/
+├── data/               # ShareGPT, HumanEval, CNN/DailyMail prompts
+├── profiles/           # py-spy flamegraphs, torch profiler traces
+├── docs/               # Architecture diagram, design doc, interview Q&A
+└── monitoring/         # Prometheus config, Grafana dashboard
+```
+ 
+---
+ 
+##  Tech stack
+ 
+| Layer | Tool |
+|---|---|
+| Model | PyTorch (CPU) + HuggingFace Transformers (GPT-2) |
+| Server | FastAPI + uvicorn |
+| Tracing | structlog + UUID request IDs |
+| Load testing | Locust |
+| Benchmarks | ShareGPT (50 conv) + HumanEval (30 code) + CNN/DailyMail (20 summaries) |
+| Profiling | py-spy + torch.profiler |
+| Memory monitoring | psutil + tracemalloc |
+| Observability | Prometheus + Grafana |
+| CI | GitHub Actions |
+ 
+---
+ 
+## 📝 Failure log
+ 
+### Entry 1 — Day 1: False baseline (attention_mask bug)
+ 
+| Field | Detail |
+|---|---|
+| Date | 2026-05-15 |
+| What happened | Baseline reported 20.60 tok/s — unrealistically high for i5 CPU |
+| How I found it | Expected range is 8–12 tok/s for this hardware; 20.60 far exceeded it |
+| Root cause | GPT-2 pad token = eos token, causing incorrect attention_mask inference |
+| Fix applied | Corrected mask handling; result dropped to honest 11.49 tok/s |
+| Time to fix | ~2 hours |
+| What I learned | Always sanity-check performance numbers against hardware specs. A number that looks too good is a bug, not a win. |
+ 
+---
+ 
+##  RAM requirements
+ 
+| Model | Size | RAM (idle) | RAM (1k ctx) | Max context |
+|---|---|---|---|---|
+| GPT-2 Small | 124M | ~500 MB | ~620 MB | 1024 tokens (architectural limit) |
+| GPT-2 Medium | 355M | ~1.4 GB | ~1.7 GB | 1024 tokens |
+| GPT-2 Large | 774M | ~3.0 GB | ~3.6 GB | 1024 tokens |
+ 
+> GPT-2's 1024-token limit comes from sinusoidal positional embeddings.
+> For 32k context, you need RoPE or ALiBi (e.g. LLaMA, GPT-NeoX).
+ 
+---
+ 
+*60-day project · GPT-2 on i5 CPU · All algorithms implemented from scratch*
+*Last updated: Day 5 of 60*
+ 
+
 ## Benchmark Section
 comming soon....
 will include:
@@ -282,22 +406,28 @@ concurrency level
 (to show scalability thinking)
 
 ##  Quick Start (5 minutes)
-
 ### Clone and setup
-
 ```bash
-git clone https://github.com/Akshatha-22/LLM-Inference-Serving-System
-.git
-cd llm-inference-serving
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-pip install -r requirements.txt
+git clone https://github.com/yourusername/llm-inference-server
+cd llm-inference-server
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e .
+ 
+# Start the server
+uvicorn src.server.app:app --host 0.0.0.0 --port 8000
+ 
+# Test it
+curl -X POST http://localhost:8000/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "The future of AI is", "max_tokens": 50}'
 ```
-
-## Repository Structure
-
+ 
+---
 ## Screenshots Section
 
-
+*60-day project · GPT-2 on i5 CPU · All algorithms implemented from scratch*
+*Last updated: Day 5 of 60*
+ 
 
 
