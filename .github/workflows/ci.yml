@@ -1,0 +1,91 @@
+name: CI - Performance Regression Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest  # GitHub's free runner
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install locust pytest
+    
+    - name: Start server in background
+      run: |
+        python run_server.py &
+        sleep 10  # Wait for server to start
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/ -v --tb=short
+    
+    - name: Run baseline correctness test
+      run: |
+        python benchmarks/run_baseline.py
+    
+    - name: Run load test (10 users, quick)
+      run: |
+        locust -f benchmarks/locustfile.py \
+          --host=http://localhost:8000 \
+          --users=10 \
+          --spawn-rate=2 \
+          --run-time=30s \
+          --headless \
+          --only-summary
+    
+    - name: Check performance degradation
+      run: |
+        python -c "
+import json
+import sys
+
+try:
+    with open('benchmarks/results/baseline_results.json', 'r') as f:
+        data = json.load(f)
+    
+    baseline = data.get('baseline', {})
+    latest = data.get('latest', {})
+    
+    if baseline and latest:
+        baseline_p99 = baseline.get('p99_ms', 0)
+        current_p99 = latest.get('p99_ms', 0)
+        
+        if baseline_p99 > 0:
+            degradation = (current_p99 - baseline_p99) / baseline_p99 * 100
+            if degradation > 10:
+                print(f'❌ Performance regression: P99 increased by {degradation:.1f}%')
+                print(f'   Baseline: {baseline_p99:.2f}ms, Current: {current_p99:.2f}ms')
+                sys.exit(1)
+            else:
+                print(f'✅ Performance within threshold: {degradation:.1f}% change')
+        else:
+            print('⚠️ No baseline found. Run --save-baseline first.')
+    else:
+        print('⚠️ No baseline or latest results found.')
+except FileNotFoundError:
+    print('⚠️ No baseline results file found. This is expected for first run.')
+"
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          benchmarks/results/
+          pytest.xml
