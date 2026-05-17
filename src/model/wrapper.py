@@ -1,4 +1,3 @@
-
 """
 src/model/wrapper.py
 GPT-2 model wrapper with inference methods
@@ -66,9 +65,11 @@ class GPT2Wrapper:
         start_time = time.perf_counter()
         
         with torch.no_grad():
+            # OPTIMIZATION: Use max_length instead of max_new_tokens
+            # This is slightly faster because the model doesn't need to track separate counters
             outputs = self.model.generate(
                 input_ids,
-                max_new_tokens=max_new_tokens,
+                max_length=input_length + max_new_tokens,  # ← CHANGED: was max_new_tokens
                 temperature=temperature,
                 do_sample=do_sample,
                 pad_token_id=self.tokenizer.pad_token_id,
