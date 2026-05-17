@@ -311,6 +311,20 @@ tokenizer.pad_token = tokenizer.eos_token
 | Day 41–44 | + Speculative decoding | 11.49 | ~50 tok/s (+335%) | ⏳ not started |
  
 ---
+## Baseline Performance (Day 6-7)
+
+**Hardware:** Intel i5 CPU, 16GB RAM, no GPU
+**Model:** GPT-2 Small (124M)
+
+| Metric | Value |
+|--------|-------|
+| Single-request tokens/sec | 9.07 tok/s |
+| Avg latency (5 prompts) | 3309 ms |
+| P99 latency | 3376 ms |
+| Max concurrent before saturation | ~5 users |
+
+**Note:** These are realistic CPU numbers. Optimizations will be measured against this baseline.
+---
  
 ## 🗂️ Project structure
  
@@ -415,7 +429,7 @@ coming soon....
 ---
 
 *60-day project · GPT-2 on i5 CPU · All algorithms implemented from scratch*
-*Last updated: Day 5 of 60*
+*Last updated: Day 7 of 60*
  
 
 
